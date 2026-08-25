@@ -77,13 +77,20 @@ def cells(w, h, name="", size=4, jitter=0.35, **_):
     """Cellules carrees d'altitudes differentes (graviers, blocs concasses)."""
     rnd = random.Random(_seed_of(name, 991))
     n = max(1, w // max(1, size))
-    lvl = [[rnd.uniform(0.5 - jitter, 0.5 + jitter) + 0.5 for _ in range(n)] for _ in range(n)]
+    # les altitudes restent sous 1.0 : centrees sur 1.0, la moitie des cellules
+    # butait sur le plafond et se retrouvait a la meme hauteur, la plus creusee
+    # perdant meme sa rainure
+    lvl = [[rnd.uniform(1.0 - jitter, 1.0) for _ in range(n)] for _ in range(n)]
     out = [0.0] * (w * h)
     for y in range(h):
         cy = (y * n // h) % n
+        # une rainure marque la premiere ligne / colonne de chaque cellule :
+        # la deduire du meme reseau que l'indice evite qu'elle derive vers
+        # l'interieur des cellules quand w n'est pas divisible par la taille
+        edge_y = cy != (((y - 1) * n // h) % n)
         for x in range(w):
             cx = (x * n // w) % n
-            edge = (x % max(1, w // n) == 0) or (y % max(1, h // n) == 0)
+            edge = edge_y or (cx != (((x - 1) * n // w) % n))
             out[y * w + x] = max(0.0, min(1.0, lvl[cy][cx] - (0.35 if edge else 0.0)))
     return out
 
@@ -145,13 +152,18 @@ def strips(w, h, name="", axis="v", width=2, depth=0.35, **_):
     out = [1.0] * (w * h)
     rnd = random.Random(_seed_of(name, 71))
     span = w if axis == "v" else h
-    n = max(1, span // max(1, width))
+    # les bandes partagent le span en parts exactes : avec une simple division
+    # entiere, la derniere bande partielle se repliait sur la premiere et
+    # doublait la rainure a la jointure entre deux blocs
+    # au moins deux pixels par bande, sinon la rainure occupe toute la bande
+    # et deux rainures se retrouvent collees
+    n = max(1, min(max(1, span // 2), int(round(span / float(max(1, width))))))
     lv = [rnd.uniform(0.55, 1.0) for _ in range(n)]
     for y in range(h):
         for x in range(w):
             t = x if axis == "v" else y
-            k = (t // max(1, width)) % n
-            edge = (t % max(1, width)) == 0
+            k = t * n // span
+            edge = (t * n) % span < n          # premiere ligne de la bande
             out[y * w + x] = max(0.0, lv[k] - (depth if edge else 0.0))
     return out
 
@@ -164,7 +176,8 @@ def grain(w, h, name="", axis="v", amp=0.25, **_):
     for y in range(h):
         for x in range(w):
             t = x if axis == "v" else y
-            wobble = 0.03 * math.sin((y if axis == "v" else x) * 0.9 + t)
+            u = (y if axis == "v" else x) / float(h if axis == "v" else w)
+            wobble = 0.03 * math.sin(2.0 * math.pi * u + t)
             out[y * w + x] = max(0.0, min(1.0, lanes[t % len(lanes)] + wobble))
     return out
 
@@ -267,6 +280,7 @@ def slats(w, h, name="", n=4, axis="h", depth=0.9, thickness=1, **_):
     out = [1.0] * (w * h)
     span = h if axis == "h" else w
     step = max(2, span // max(1, n))
+    thickness = max(1, min(thickness, step - 1))   # toujours au moins un vide
     for y in range(h):
         for x in range(w):
             t = y if axis == "h" else x

@@ -249,13 +249,74 @@ class TestPatterns(unittest.TestCase):
         for (nx, ny, nz) in PAT.height_to_normal(hm, 16, 16, 1.2):
             self.assertAlmostEqual((nx * nx + ny * ny + nz * nz) ** 0.5, 1.0, places=6)
 
+    def test_cells_grooves_follow_cell_seams(self):
+        """Les cellules suivent un decoupage fractionnaire ; tracer les rainures
+        sur un decoupage entier les fait deriver vers l'interieur des cellules
+        des que la largeur n'est pas divisible par la taille de cellule."""
+        for w in (15, 16, 17, 32, 64, 128):
+            for size in (3, 4, 8):
+                n = max(1, w // size)
+                hm = PAT.cells(w, w, name="gravel", size=size, jitter=0.45)
+                rows = [y for y in range(w) if (y * n // w) % n == (((y - 1) * n // w) % n)]
+                y = rows[0] if rows else 0
+                row = [hm[y * w + x] for x in range(w)]
+                tops = {}
+                for x in range(w):
+                    cx = (x * n // w) % n
+                    tops[cx] = max(tops.get(cx, 0.0), row[x])
+                grooves = {x for x in range(w) if row[x] < tops[(x * n // w) % n] - 0.2}
+                seams = {x for x in range(w) if (x * n // w) % n != (((x - 1) * n // w) % n)}
+                self.assertEqual(grooves, seams,
+                                 "w=%d size=%d : rainures et coutures divergent" % (w, size))
+
+    def test_cells_levels_never_clamp(self):
+        """Centrees sur 1.0, la moitie des altitudes butait sur le plafond et
+        se retrouvait a la meme hauteur - la plus creusee perdant sa rainure."""
+        for jitter in (0.18, 0.3, 0.45, 0.6):
+            hm = PAT.cells(16, 16, name="gravel", size=3, jitter=jitter)
+            flat = sum(1 for v in hm if v >= 0.999)
+            self.assertLessEqual(flat, 1, "jitter=%s : %d pixels ecretes" % (jitter, flat))
+
+    def test_strips_join_cleanly_between_blocks(self):
+        for span in (7, 15, 16, 17, 32, 48, 64):
+            for width in (2, 3, 4, 5, 6):
+                n = max(1, min(max(1, span // 2), int(round(span / float(width)))))
+                hm = PAT.strips(span, span, axis="v", width=width, depth=0.4)
+                row = hm[:span]
+                grooves = sorted(x for x in range(span) if (x * n) % span < n)
+                self.assertEqual(len(grooves), n)
+                if n > 1:
+                    gaps = [(grooves[(i + 1) % n] - grooves[i]) % span for i in range(n)]
+                    self.assertGreaterEqual(min(gaps), 2,
+                                            "span=%d width=%d : rainures collees a la "
+                                            "jointure entre deux blocs" % (span, width))
+                self.assertGreater(len(set(row)), 1)
+
+    def test_slats_always_leave_a_gap(self):
+        for span in (3, 8, 11, 16, 32):
+            for n in (4, 8):
+                for thickness in (1, 2, 3):
+                    hm = PAT.slats(span, span, n=n, axis="h", depth=0.85, thickness=thickness)
+                    self.assertGreater(len(set(hm)), 1,
+                                       "span=%d n=%d ep=%d : grille pleine" % (span, n, thickness))
+
     def test_patterns_tile_without_seam(self):
         """Le gradient au bord doit rester du meme ordre qu'a l'interieur :
         sinon une couture apparait entre deux blocs adjacents."""
-        hm = PAT.compose([("fbm", 1.0, dict(octaves=3, scale=4))], 16, 16, "tile")
-        wrap = max(abs(hm[y * 16 + 15] - hm[y * 16 + 0]) for y in range(16))
-        inner = max(abs(hm[y * 16 + 8] - hm[y * 16 + 7]) for y in range(16))
-        self.assertLessEqual(wrap, max(0.25, inner * 3.0))
+        # frame() et rings() ne sont pas tuilables par construction : l'un
+        # dessine une bordure, l'autre des cernes concentriques.
+        tileable = [k for k in PAT.PATTERNS if k not in ("frame", "rings")]
+        for kind in tileable:
+            with self.subTest(pattern=kind):
+                hm = PAT.PATTERNS[kind](16, 16, name="tile")
+                wrap_x = max(abs(hm[y * 16 + 15] - hm[y * 16 + 0]) for y in range(16))
+                inner_x = max(abs(hm[y * 16 + x + 1] - hm[y * 16 + x])
+                              for y in range(16) for x in range(14))
+                wrap_y = max(abs(hm[15 * 16 + x] - hm[0 * 16 + x]) for x in range(16))
+                inner_y = max(abs(hm[(y + 1) * 16 + x] - hm[y * 16 + x])
+                              for x in range(16) for y in range(14))
+                self.assertLessEqual(wrap_x, max(0.2, inner_x * 1.35), "couture verticale")
+                self.assertLessEqual(wrap_y, max(0.2, inner_y * 1.35), "couture horizontale")
 
 
 class TestLabPbrEncoding(unittest.TestCase):
