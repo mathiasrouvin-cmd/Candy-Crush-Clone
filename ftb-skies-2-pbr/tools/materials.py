@@ -463,7 +463,7 @@ add(["redstone_torch"], derive(LAMP, emission=0.48, smooth=40, f0=F0_WOOD))
 # fourneau allumé (lumière 13) : contrairement au haut-fourneau et au fumoir,
 # sa façade allumée est bien une texture statique
 add(["furnace_front_on"], derive(COBBLE, smooth=40, emission=0.85, relief=0.8,
-                                 emissive_layers=[("frame", 1.0, dict(border=4, depth=0.9, inner=1.0))]))
+                                 emissive_layers=[("frame", 1.0, dict(border=2, depth=0.15, inner=1.0))]))
 add(["redstone_torch_off"], derive(PLANK, smooth=40, emission=0.0))
 add(["jack_o_lantern"], derive(FOLIAGE, smooth=30, emission=0.9, sss=120))
 add(["beacon"], derive(GLASS, emission=0.85, smooth=240))
@@ -630,7 +630,7 @@ add(["nether_portal"], derive(GLASS, emission=0.80, smooth=200, sss=180, porosit
 add(["respawn_anchor_top"], derive(OBSIDIAN, emission=0.80, smooth=168))
 add(["blast_furnace_front_on", "smoker_front_on"],
     derive(COBBLE, smooth=40, emission=0.85, relief=0.8,
-           emissive_layers=[("frame", 1.0, dict(border=4, depth=0.9, inner=1.0))]))
+           emissive_layers=[("frame", 1.0, dict(border=2, depth=0.15, inner=1.0))]))
 add(["sculk", "sculk_vein"], SCULK)
 add(["sculk_sensor_tendril_active"], derive(SCULK, emission=0.45))
 add(["sculk_sensor_tendril_inactive"], SCULK)

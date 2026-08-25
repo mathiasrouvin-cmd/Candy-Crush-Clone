@@ -21,6 +21,7 @@ Usage :
 """
 
 import argparse
+import json
 import math
 import os
 import shutil
@@ -50,6 +51,45 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Pixel neutre du _n : c'est exactement la texture par defaut d'Iris
 # (PBRType.NORMAL = 0x7F7FFFFF), soit 127 et non 128 - le vrai milieu est 127,5.
 NEUTRAL_N = (127, 127, 255, 255)
+
+
+def crop(img, top, height):
+    """Extrait une tranche horizontale de l'image (une image d'animation)."""
+    out = Image(img.w, height)
+    start = top * img.w * 4
+    out.data[:] = img.data[start:start + img.w * height * 4]
+    return out
+
+
+def vstack(parts):
+    """Ré-empile des images de meme largeur en une bande verticale."""
+    w = parts[0].w
+    out = Image(w, sum(p.h for p in parts))
+    off = 0
+    for p in parts:
+        out.data[off:off + len(p.data)] = p.data
+        off += len(p.data)
+    return out
+
+
+def frame_height(w, h, meta_text):
+    """Hauteur d'une image d'animation.
+
+    Une bande verticale doit etre traitee image par image : sinon le calcul des
+    normales, qui boucle sur les bords, relie la derniere ligne d'une image a la
+    premiere de la suivante et fausse une ligne de pixels par image.
+    """
+    if h <= w:
+        return h
+    if meta_text:
+        try:
+            anim = json.loads(meta_text).get("animation", {})
+            declared = anim.get("height")
+            if isinstance(declared, int) and declared > 0 and h % declared == 0:
+                return declared
+        except Exception:
+            pass
+    return w if h % w == 0 else h
 
 
 def encode_normal(height, w, h, m, use_pom=True, use_ao=True):
@@ -171,7 +211,10 @@ def emissive_mask_from_image(img, threshold=0.55):
         sat = 0.0 if mx == 0 else (mx - mn) / float(mx)
         l = luminance(px)
         v = max(0.0, (l - threshold) / max(1e-6, 1.0 - threshold))
-        out.append(max(0.0, min(1.0, v * 0.7 + sat * l * 0.6)))
+        # la saturation renforce l'emission d'un pixel deja lumineux, mais ne
+        # doit jamais en creer une sous le seuil : sans ce produit, un violet
+        # sombre d'obsidienne pleureuse se mettrait a briller
+        out.append(max(0.0, min(1.0, v * (0.7 + sat * 0.6))))
     if max(out, default=0.0) < 0.05:
         return None   # rien d'assez lumineux : on garde une emission uniforme
     return out
@@ -480,10 +523,27 @@ def generate(args):
             emask = emissive_mask_from_image(base_img) if m["emission"] > 0 else None
             stats["from_reference"] += 1
 
-        n_img = encode_normal(height, w, h, m, use_pom=not args.no_pom, use_ao=not args.no_ao)
-        s_img = encode_specular(w, h, m, name, emask)
-        if base_img is not None:
-            apply_alpha_cutout(n_img, s_img, base_img)
+        fh = frame_height(w, h, frames_meta) if base_img is not None else h
+        if fh < h:
+            # bande d'animation : chaque image est traitee isolement
+            n_parts, s_parts = [], []
+            for k in range(h // fh):
+                sub = crop(base_img, k * fh, fh)
+                sub_height = height_from_image(sub, args.blend, name, m["layers"])
+                sub_mask = emissive_mask_from_image(sub) if m["emission"] > 0 else None
+                n_part = encode_normal(sub_height, w, fh, m,
+                                       use_pom=not args.no_pom, use_ao=not args.no_ao)
+                s_part = encode_specular(w, fh, m, name, sub_mask)
+                apply_alpha_cutout(n_part, s_part, sub)
+                n_parts.append(n_part)
+                s_parts.append(s_part)
+            n_img, s_img = vstack(n_parts), vstack(s_parts)
+        else:
+            n_img = encode_normal(height, w, h, m,
+                                  use_pom=not args.no_pom, use_ao=not args.no_ao)
+            s_img = encode_specular(w, h, m, name, emask)
+            if base_img is not None:
+                apply_alpha_cutout(n_img, s_img, base_img)
 
         dest_dir = os.path.join(out_pack, "assets", ns, "textures", os.path.dirname(rel))
         os.makedirs(dest_dir, exist_ok=True)

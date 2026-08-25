@@ -726,6 +726,63 @@ class TestReferenceBuild(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_animation_frames_are_encoded_independently(self):
+        """Le calcul des normales boucle sur les bords. Sur une bande verticale,
+        boucler sur toute la hauteur relie la derniere ligne d'une image a la
+        premiere de la suivante. Deux images identiques doivent donner deux
+        cartes identiques : c'est faux si le voisinage deborde sur la voisine."""
+        tmp = tempfile.mkdtemp()
+        try:
+            block = os.path.join(tmp, "src", "assets", "minecraft", "textures", "block")
+            os.makedirs(block)
+            strip = Image(16, 48)          # 3 images de 16x16
+            for y in range(48):
+                frame, yy = y // 16, y % 16    # yy : les images 0 et 2 sont identiques
+                for x in range(16):
+                    if frame == 1:         # l'image du milieu differe des deux autres
+                        v = 40 + ((x * 3 + yy) % 30)
+                    else:
+                        v = 180 + ((x * 7 + yy) % 20)
+                    strip.put(x, y, (v, v, v, 255))
+            write_png(os.path.join(block, "sea_lantern.png"), strip)
+            with open(os.path.join(block, "sea_lantern.png.mcmeta"), "w") as fh:
+                fh.write('{"animation": {"frametime": 5}}')
+            pack, stats = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                   vanilla=os.path.join(tmp, "src")))
+            self.assertEqual(stats["animated_handled"], 1)
+            n = read_png(os.path.join(pack, "assets/minecraft/textures/block/sea_lantern_n.png"))
+            self.assertEqual((n.w, n.h), (16, 48))
+
+            def frame_bytes(img, k):
+                start = k * 16 * img.w * 4
+                return bytes(img.data[start:start + 16 * img.w * 4])
+
+            self.assertEqual(frame_bytes(n, 0), frame_bytes(n, 2),
+                             "deux images identiques donnent des cartes differentes : "
+                             "le voisinage deborde sur l'image suivante")
+            self.assertNotEqual(frame_bytes(n, 0), frame_bytes(n, 1),
+                                "une image differente doit donner une carte differente")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_emissive_mask_ignores_dark_saturated_pixels(self):
+        """Un pixel sombre mais tres colore ne doit pas se mettre a emettre :
+        le terme de saturation renforce, il ne declenche pas."""
+        dark = Image(4, 4)
+        for y in range(4):
+            for x in range(4):
+                dark.put(x, y, (70, 0, 90, 255))     # violet sombre, tres sature
+        self.assertIsNone(BUILD.emissive_mask_from_image(dark),
+                          "aucun pixel ne devrait etre juge emissif")
+        bright = Image(4, 4)
+        for y in range(4):
+            for x in range(4):
+                bright.put(x, y, (255, 240, 120, 255) if x < 2 else (20, 20, 25, 255))
+        mask = BUILD.emissive_mask_from_image(bright)
+        self.assertIsNotNone(mask)
+        self.assertGreater(mask[0], 0.3, "un pixel clair doit emettre")
+        self.assertLess(mask[2], 0.05, "un pixel sombre ne doit pas emettre")
+
     def test_validator_passes_on_reference_build(self):
         errs, _warns, checked, _pairs = VAL.validate(self.pack)
         self.assertEqual(errs, [])

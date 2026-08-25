@@ -95,6 +95,7 @@ def cells(w, h, name="", size=4, jitter=0.35, **_):
 
 def bricks(w, h, name="", rows=4, cols=2, mortar=1, depth=1.0, stagger=True, **_):
     """Appareil de briques : joints creuses, decalage d'une rangee sur deux."""
+    rows, cols = max(1, rows), max(1, cols)
     rh = max(1, h // rows)
     cw = max(1, w // cols)
     out = [1.0] * (w * h)
@@ -119,6 +120,7 @@ def planks(w, h, name="", count=4, axis="h", groove=1, depth=0.7, **_):
     """Planches paralleles avec rainure entre chaque, plus un leger galbe."""
     out = [1.0] * (w * h)
     rnd = random.Random(_seed_of(name, 53))
+    count = max(1, count)
     span = h if axis == "h" else w
     pw = max(1, span // count)
     tint = [rnd.uniform(-0.08, 0.06) for _ in range(count + 1)]
@@ -181,6 +183,7 @@ def rings(w, h, name="", spacing=2.2, depth=0.3, **_):
 
 def grid(w, h, name="", n=2, groove=1, depth=0.8, **_):
     """Grille reguliere (carrelage, blocs cisele, quartz)."""
+    n = max(1, n)
     cw = max(1, w // n)
     ch = max(1, h // n)
     out = [1.0] * (w * h)
@@ -192,7 +195,12 @@ def grid(w, h, name="", n=2, groove=1, depth=0.8, **_):
 
 
 def frame(w, h, name="", border=1, depth=0.5, inner=0.85, **_):
-    """Bordure en relief autour d'un panneau plat (blocs cisele, coffres)."""
+    """Bordure en relief autour d'un panneau plat (blocs cisele, coffres).
+
+    La largeur de bordure est bornee pour qu'il reste toujours un panneau :
+    au-dela, les deux anneaux se rejoignaient et le motif devenait uniforme.
+    """
+    border = max(1, min(border, max(1, (min(w, h) - 1) // 4)))
     out = [inner] * (w * h)
     for y in range(h):
         for x in range(w):
@@ -206,6 +214,7 @@ def frame(w, h, name="", border=1, depth=0.5, inner=0.85, **_):
 def weave(w, h, name="", size=2, amp=0.35, **_):
     """Tissage regulier : laine, tapis, tissus."""
     out = [0.0] * (w * h)
+    size = max(1, size)
     for y in range(h):
         for x in range(w):
             u = math.sin((x / size) * math.pi) * math.cos((y / size) * math.pi)
@@ -241,6 +250,7 @@ def organic(w, h, name="", amp=0.5, **_):
 
 def scales(w, h, name="", size=4, depth=0.4, **_):
     """Ecailles arrondies : prismarine, tortue, cuivre patine."""
+    size = max(1, size)
     out = [0.0] * (w * h)
     for y in range(h):
         for x in range(w):
@@ -286,7 +296,14 @@ PATTERNS = {
 
 
 def compose(layers, w, h, name=""):
-    """Combine plusieurs motifs ponderes en une seule carte de hauteur [0,1]."""
+    """Combine plusieurs motifs ponderes en une seule carte de hauteur [0,1].
+
+    Le resultat est toujours etire sur toute la plage [0, 1], afin que la carte
+    de hauteur exploite tout le canal alpha disponible pour le parallaxe. Par
+    consequent le parametre `depth` d'un motif agit sur la forme et sur le
+    rapport entre couches, pas sur l'amplitude finale : celle-ci se regle par
+    materiau, avec `relief` (force de la normale) et `pom` (profondeur).
+    """
     if not layers:
         return flat(w, h)
     acc = [0.0] * (w * h)
