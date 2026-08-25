@@ -102,22 +102,27 @@ def render_tile(n_img, s_img, size, albedo=(168, 168, 172)):
                     diffuse = (0.18 + 0.82 * ndl) * ao
                     v = base * diffuse * (1.0 - fresnel * 0.5)
                     v += (env * fresnel * smooth * 0.9 + sun * (0.10 + 0.90 * smooth) * fresnel * 6.0) * ao
-                v += emission * 0.85
+                v = v * (1.0 - 0.55 * emission) + emission * 0.62
                 out_px.append(max(0, min(255, int(round(v * 255)))))
             out.put(px, py, (out_px[0], out_px[1], out_px[2], 255))
     return out
 
 
 def contact_sheet(pack_dir, names, cols=6, tile=64, gap=4):
-    tiles = []
+    tiles, missing = [], []
     for name in names:
         n_path = os.path.join(pack_dir, "assets/minecraft/textures/block", name + "_n.png")
         s_path = os.path.join(pack_dir, "assets/minecraft/textures/block", name + "_s.png")
         if not (os.path.isfile(n_path) and os.path.isfile(s_path)):
+            missing.append(name)
             continue
         tiles.append((name, render_tile(read_png(n_path), read_png(s_path), tile)))
     if not tiles:
         raise SystemExit("aucune texture trouvee dans %s" % pack_dir)
+    if missing:
+        # sans cet avertissement, une texture absente decale toute la grille et
+        # l'on croit regarder un bloc alors qu'on en regarde un autre
+        print("  ! absentes du pack, non affichees : %s" % ", ".join(missing))
     rows = (len(tiles) + cols - 1) // cols
     W = cols * tile + (cols + 1) * gap
     H = rows * tile + (rows + 1) * gap
@@ -137,9 +142,10 @@ DEFAULT_SET = [
     "iron_block", "gold_block", "diamond_block", "copper_block", "oxidized_copper", "netherite_block",
     "sand", "sandstone", "dirt", "grass_block_top", "clay", "snow",
     "glass", "ice", "white_wool", "white_concrete", "white_glazed_terracotta", "terracotta",
-    "glowstone", "redstone_lamp_on", "shroomlight", "ochre_froglight_side", "crying_obsidian", "lantern",
+    "glowstone", "redstone_lamp_on", "shroomlight", "ochre_froglight_side", "crying_obsidian", "copper_bulb_lit",
     "iron_ore", "deepslate_diamond_ore", "amethyst_block", "quartz_block_side", "prismarine_bricks", "copper_grate",
     "netherrack", "nether_bricks", "soul_sand", "end_stone", "purpur_block", "obsidian",
+    "white_candle_lit", "vault_front_on", "copper_door_top", "bone_block_side", "rail", "sculk_catalyst_top",
 ]
 
 if __name__ == "__main__":
