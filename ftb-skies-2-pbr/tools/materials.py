@@ -243,6 +243,7 @@ ANIMATED = {
     "lantern", "soul_lantern",
     "sculk_catalyst_top_bloom", "sculk_catalyst_side_bloom",
     "sculk_shrieker_inner_top", "sculk_shrieker_can_summon_inner_top",
+    "crimson_stem", "warped_stem",
 }
 
 TEXTURES = {}
@@ -488,7 +489,7 @@ add(["target_top", "target_side"], derive(WOOL, smooth=14, porosity=52))
 add(["honeycomb_block", "honey_block_top", "honey_block_side",
      "honey_block_bottom"], derive(GLASS, smooth=180, sss=210, porosity=0, relief=0.6))
 add(["slime_block"], derive(GLASS, smooth=200, sss=230, porosity=0, relief=0.5))
-add(["moss_block", "pale_moss_block"], derive(FOLIAGE, smooth=14, sss=190, relief=1.0))
+add(["moss_block"], derive(FOLIAGE, smooth=14, sss=190, relief=1.0))
 add(["hay_block_top", "hay_block_side", "dried_kelp_top", "dried_kelp_side",
      "dried_kelp_bottom"],
     derive(WOOL, smooth=16, porosity=56,
@@ -640,3 +641,18 @@ add(["water_still", "water_flow"],
 add(["kelp", "kelp_plant", "seagrass", "tall_seagrass_top", "tall_seagrass_bottom"],
     derive(FOLIAGE, smooth=60, sss=210))
 add(["calibrated_sculk_sensor_input_side", "calibrated_sculk_sensor_amethyst"], SCULK)
+
+
+# --- Compléments 1.21 ------------------------------------------------------
+add(["coal_block"], derive(ROUGH_STONE, smooth=42, f0=F0_ROCK, porosity=14,
+                           relief=0.8, pom=0.55))
+
+# Portes et trappes en cuivre : mêmes stades d'oxydation que le reste de la
+# famille. Rappel : *_door_top / *_door_bottom désignent les moitiés HAUTE et
+# BASSE du battant, pas des faces - d'où un relief vertical continu.
+for _pfx, _sm in (("", 192), ("exposed_", 140), ("weathered_", 86), ("oxidized_", 52)):
+    add(["%scopper_door_top" % _pfx, "%scopper_door_bottom" % _pfx,
+         "%scopper_trapdoor" % _pfx],
+        derive(METAL_SMOOTH, smooth=_sm, f0=METAL_COPPER, relief=0.75, pom=0.6,
+               layers=[("strips", 1.0, dict(axis="v", width=4, depth=0.45)),
+                       ("frame", 0.6, dict(border=1, depth=0.4, inner=0.9))]))

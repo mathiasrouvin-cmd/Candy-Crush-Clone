@@ -149,7 +149,7 @@ Ce point est la principale raison d'être du mode `--all-namespaces`.
 
 ## Ce que couvre le pack
 
-**740 textures** de blocs vanilla 1.21.1 sont cataloguées, réparties par famille de matériau :
+**752 textures** de blocs vanilla 1.21.1 sont cataloguées, réparties par famille de matériau :
 
 - pierres, roches profondes, tuf, blackstone, basalte, calcite
 - briques, tuiles, blocs ciselés, grès et grès rouge
@@ -172,8 +172,8 @@ Ce point est la principale raison d'être du mode `--all-namespaces`.
   obsidienne pleureuse, bougies allumées, lianes fruitières, tiges de l'End,
   catalyseurs sculk, fourneaux allumés…
 
-Le `.zip` livré en contient **704**. Les **36 textures animées** (lanternes,
-lave, feu, portail du Nether, ancre de réapparition, haut-fourneau allumé…) sont
+Le `.zip` livré en contient **714**. Les **38 textures animées** (lanternes,
+lave, feu, portail du Nether, tiges du Nether, haut-fourneau allumé…) sont
 volontairement absentes : leur texture d'origine est une bande verticale
 d'images, et une carte de dimensions différentes serait rééchantillonnée en
 bilinéaire par Iris — ce qui corromprait justement les canaux du `_s`. Elles
@@ -349,7 +349,7 @@ ftb-skies-2-pbr/
 ├── tools/
 │   ├── pngio.py       codec PNG pur Python (lecture/écriture RGBA)
 │   ├── patterns.py    17 motifs de relief tuilables + normales/occlusion
-│   ├── materials.py   catalogue : 740 textures et leurs propriétés LabPBR
+│   ├── materials.py   catalogue : 752 textures et leurs propriétés LabPBR
 │   ├── build.py       génération du pack
 │   ├── collect_assets.py  extrait les textures d'une instance (client + mods)
 │   ├── validate.py    contrôle de conformité LabPBR
