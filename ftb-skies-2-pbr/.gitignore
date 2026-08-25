@@ -1,0 +1,4 @@
+# Sortie de génération : reconstructible avec `python3 tools/build.py --zip`
+build/
+__pycache__/
+*.pyc
