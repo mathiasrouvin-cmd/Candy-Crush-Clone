@@ -17,6 +17,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import zipfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 import build as BUILD          # noqa: E402
+import collect_assets as CA    # noqa: E402
 import materials as MAT        # noqa: E402
 import patterns as PAT         # noqa: E402
 import validate as VAL         # noqa: E402
@@ -240,6 +242,89 @@ class TestGuessMaterial(unittest.TestCase):
         # un mot entier doit toujours fonctionner
         self.assertGreaterEqual(BUILD.guess_material("deepslate_ruby_ore")["relief"],
                                 MAT.ORE["relief"])
+
+
+class TestCollectAssets(unittest.TestCase):
+    """collect_assets.py lit des archives fournies par le joueur : il doit
+    filtrer strictement et ne jamais ecrire hors du dossier de sortie."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.inst = os.path.join(self.tmp, "instance")
+        os.makedirs(os.path.join(self.inst, "mods"))
+        png = os.path.join(self.tmp, "x.png")
+        write_png(png, Image(16, 16, fill=(1, 2, 3, 255)))
+        with open(png, "rb") as fh:
+            self.blob = fh.read()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_only_block_and_item_textures_are_kept(self):
+        self.assertTrue(CA.is_wanted("assets/minecraft/textures/block/stone.png"))
+        self.assertTrue(CA.is_wanted("assets/create/textures/item/wrench.png"))
+        self.assertTrue(CA.is_wanted("assets/minecraft/textures/block/fire_0.png.mcmeta"))
+        self.assertFalse(CA.is_wanted("assets/minecraft/textures/gui/widgets.png"))
+        self.assertFalse(CA.is_wanted("assets/minecraft/sounds/x.ogg"))
+        self.assertFalse(CA.is_wanted("META-INF/MANIFEST.MF"))
+        self.assertFalse(CA.is_wanted("assets/minecraft/textures/block/stone.txt"))
+
+    def test_safe_join_blocks_escapes(self):
+        root = os.path.join(self.tmp, "out")
+        os.makedirs(root, exist_ok=True)
+        self.assertIsNone(CA.safe_join(root, "../evil.png"))
+        self.assertIsNone(CA.safe_join(root, "a/../../evil.png"))
+        self.assertIsNone(CA.safe_join(root, "/etc/evil.png"))
+        self.assertIsNotNone(CA.safe_join(root, "assets/minecraft/textures/block/a.png"))
+
+    def test_extraction_ignores_malicious_entries(self):
+        jar = os.path.join(self.inst, "mods", "evil.jar")
+        with zipfile.ZipFile(jar, "w") as z:
+            z.writestr("assets/create/textures/block/brass_casing.png", self.blob)
+            z.writestr("../../../evil.png", self.blob)
+            z.writestr("assets/../../../etc/evil2.png", self.blob)
+        out = os.path.join(self.tmp, "out")
+        written, _skipped, namespaces = CA.extract([jar], out)
+        self.assertEqual(written, 1)
+        self.assertEqual(namespaces, {"create"})
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "evil.png")))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "instance", "evil.png")))
+
+    def test_first_jar_wins_on_duplicate(self):
+        a = os.path.join(self.inst, "mods", "a.jar")
+        b = os.path.join(self.inst, "mods", "b.jar")
+        other = Image(16, 16, fill=(9, 9, 9, 255))
+        other_path = os.path.join(self.tmp, "other.png")
+        write_png(other_path, other)
+        with open(other_path, "rb") as fh:
+            other_blob = fh.read()
+        with zipfile.ZipFile(a, "w") as z:
+            z.writestr("assets/create/textures/block/x.png", self.blob)
+        with zipfile.ZipFile(b, "w") as z:
+            z.writestr("assets/create/textures/block/x.png", other_blob)
+        out = os.path.join(self.tmp, "out")
+        CA.extract([a, b], out)
+        img = read_png(os.path.join(out, "assets/create/textures/block/x.png"))
+        self.assertEqual(img.get(0, 0), (1, 2, 3, 255))
+
+    def test_full_chain_instance_to_valid_pack(self):
+        with zipfile.ZipFile(os.path.join(self.inst, "1.21.1.jar"), "w") as z:
+            z.writestr("assets/minecraft/textures/block/stone.png", self.blob)
+            z.writestr("assets/minecraft/textures/item/diamond.png", self.blob)
+        with zipfile.ZipFile(os.path.join(self.inst, "mods", "create.jar"), "w") as z:
+            z.writestr("assets/create/textures/block/brass_casing.png", self.blob)
+        out = os.path.join(self.tmp, "assets_out")
+        jars = CA.find_jars([self.inst], include_client=True)
+        self.assertEqual(len(jars), 2)
+        CA.extract(jars, out)
+        pack, _st = BUILD.generate(make_args(out=os.path.join(self.tmp, "b"),
+                                             vanilla=out, all_namespaces=True, items=True))
+        errs, _w, checked, _p = VAL.validate(pack)
+        self.assertEqual(errs, [])
+        self.assertGreater(checked, 600)
+        for rel in ("assets/create/textures/block/brass_casing_n.png",
+                    "assets/minecraft/textures/item/diamond_s.png"):
+            self.assertTrue(os.path.isfile(os.path.join(pack, rel)), rel)
 
 
 class TestProceduralBuild(unittest.TestCase):

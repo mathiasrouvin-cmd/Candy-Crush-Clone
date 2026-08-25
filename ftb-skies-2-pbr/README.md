@@ -40,37 +40,58 @@ les lanternes éclairent par elles-mêmes, et les briques prennent du creux.
 
 ## Installation dans FTB Skies 2
 
-### 1. Le shader (obligatoire)
+### 1. Le shader : il est déjà là
 
-FTB Skies 2 tourne sur **Minecraft 1.21.1 / NeoForge**. Le mod qui charge les
-shaders est **Iris** (versions 1.8.x pour NeoForge 1.21.1). Oculus n'est pas
-nécessaire et ne va pas jusqu'à 1.21.1.
+Pas besoin d'installer Iris. FTB Skies 2 embarque déjà toute la pile de rendu —
+**Iris 1.8.12 + Embeddium + Monocle** — et livre même un shader **déjà
+décompressé** dans `shaderpacks/` : *Complementary Reimagined + Euphoria Patches*.
 
-Si le modpack ne l'inclut pas déjà, ajoute Iris à l'instance, puis dépose un
-shader dans le dossier `shaderpacks/`.
+Il faut seulement l'activer : *Options → Video Settings → Shader Packs* → clique
+sur le shader. **Aucun shader n'est actif d'origine** (`shaderPack=` est vide
+dans `config/iris.properties`), c'est pour ça que le dossier pré-installé semble
+ne rien faire.
 
-Shaders qui exploitent LabPBR (donc ce pack) :
+> **Ne remplace pas Embeddium par Sodium.** Le conseil « installe Sodium + Iris »
+> qu'on lit partout pour 1.21.1 **casse ce modpack** : Monocle est précisément là
+> pour qu'Iris rende à travers Embeddium. Idem pour Oculus et Rubidium, qui sont
+> des mods Forge de l'ère 1.20.1 et n'existent pas pour NeoForge 1.21.1.
 
-| Shader | Remarque |
-|---|---|
-| **Complementary Reimagined** | le plus sûr pour commencer, très bon rapport qualité/performances |
-| **Complementary Unbound** | rendu plus neutre/réaliste, même moteur |
-| **Rethinking Voxels** | éclairage voxel, plus gourmand, très beau sur les blocs émissifs |
-| **BSL** | classique, LabPBR pris en charge |
-| **Photon** | orienté réalisme |
+Si l'écran de sélection des shaders apparaît **vide ou juste flou** alors qu'il
+répond aux clics : c'est un défaut d'affichage connu d'Iris avec le flou de
+menu. Mets `menuBackgroundBlurriness:0` dans l'`options.txt` de l'instance.
+
+Tu peux évidemment mettre un autre shader (BSL, Photon, Rethinking Voxels…) dans
+`shaderpacks/` — voir le tableau de réglages plus bas.
 
 ### 2. Le pack
 
-1. Récupère `SkiesPBR-1.0.0.zip` (voir *Construire le pack* plus bas, ou le
-   dossier `build/dist/`).
-2. Ouvre le dossier de l'instance FTB Skies 2 :
-   - **FTB App** : bouton `...` sur l'instance → *Open Folder*
+1. Récupère **`dist/SkiesPBR-1.0.0.zip`** (déjà construit dans ce dépôt), ou
+   reconstruis-le toi-même — voir *Construire le pack* plus bas.
+2. Ouvre le dossier de l'instance. **Ne cherche pas le chemin à la main** : selon
+   l'âge de ton installation, le dossier s'appelle `ftb skies 2` ou porte un
+   identifiant du genre `e978a054-423f-…`.
+   - **FTB App** : bouton `...` sur l'instance → *Settings* → **Open Folder**
    - **CurseForge** : `...` → *Open Folder*
    - **Prism / MultiMC** : clic droit → *Folder* → *.minecraft*
-3. Copie le `.zip` dans le sous-dossier **`resourcepacks/`**.
-4. En jeu : *Options → Packs de ressources* → passe **Skies PBR** à droite, et
-   place-le **tout en haut de la pile** (priorité maximale).
-5. *Options → Vidéo → Shaders* : sélectionne ton shader.
+3. Dépose le `.zip` dans **`resourcepacks/`**.
+
+   > Sous FTB App et CurseForge, **le dossier d'instance est déjà le dossier de
+   > jeu** : `resourcepacks/` est directement à la racine, à côté de `mods/` et
+   > `config/`. Il n'y a **pas** de sous-dossier `.minecraft` — contrairement à
+   > Prism. C'est l'erreur la plus fréquente.
+
+4. En jeu : *Options → Packs de ressources* → passe **Skies PBR** à droite, puis
+   **glisse-le tout en haut** de la colonne de droite.
+
+   FTB Skies 2 épingle son pack de police (*Slightly-Improved-Font*) en haut de
+   la pile : tu peux le faire redescendre, il n'est pas verrouillé. En revanche
+   les paquets de ressources des mods sont verrouillés tout en bas — c'est une
+   bonne nouvelle, ton pack passe toujours devant eux.
+
+   Si tu as activé un des packs de retexture livrés avec le modpack
+   (*AE2 Blackout*, *Better Replication Pipes*, *Pretty X Smart Pipez*),
+   place-les **sous** Skies PBR — sinon ces blocs prendraient leurs couleurs
+   d'un pack et leur relief d'un autre.
 
 ### 3. Les réglages du shader (l'étape qu'on oublie)
 
@@ -99,9 +120,16 @@ Deux pièges fréquents :
   *Advanced Materials* est désactivé. Et un mauvais *Material Format* ne produit
   pas d'erreur : juste des reflets faux, mais crédibles.
 
-### ⚠️ À lire si tu joues avec Complementary ou Rethinking Voxels
+### ⚠️ Important : le shader livré avec FTB Skies 2 ignore ce pack par défaut
 
-Sur ces shaders, passer `RP Support` sur **labPBR désactive Integrated PBR+** —
+*Complementary Reimagined + Euphoria Patches*, celui que le modpack pré-installe,
+est livré sur `RP Support = Integrated PBR+`. Dans ce mode il **ignore purement
+et simplement** les cartes `_n` / `_s`. Tant que tu ne passes pas ce réglage sur
+**labPBR (RP Required)**, le pack ne changera rien — quoi que tu fasses par
+ailleurs. C'est de loin la cause n°1 de « j'ai installé le pack, je ne vois rien ».
+
+Mais attention à ce que ce basculement entraîne :
+passer `RP Support` sur **labPBR désactive Integrated PBR+** —
 le système qui génère automatiquement du relief, des minerais brillants et du
 verre travaillé pour *tous* les blocs, y compris ceux des mods.
 
@@ -171,23 +199,32 @@ Ce mode :
 - gère les **textures animées** (taille exacte + `.mcmeta` recopié) et les
   textures **HD** d'un pack 32× ou 64×.
 
-### Où trouver les textures de référence
+### En pratique, en deux commandes
 
-Les textures vanilla sont dans le `.jar` du client :
+`tools/collect_assets.py` fait le travail fastidieux : il parcourt le jar du
+client **et tous les jars de `mods/`**, et en extrait les textures de blocs et
+d'objets dans un seul arbre `assets/`.
 
 ```bash
-mkdir -p /tmp/mcassets && cd /tmp/mcassets
-unzip -o "<instance>/.minecraft/versions/1.21.1/1.21.1.jar" 'assets/*' -d .
-python3 tools/build.py --vanilla /tmp/mcassets --zip
+# 1. rassembler les textures de l'instance (le chemin = celui d'« Open Folder »)
+python3 tools/collect_assets.py "/chemin/vers/instance/ftb skies 2" -o /tmp/mcassets
+
+# 2. générer le pack qui couvre vanilla ET les mods
+python3 tools/build.py --vanilla /tmp/mcassets --all-namespaces --items --zip
 ```
 
-Pour les blocs de mods, extrais aussi les `.jar` du dossier `mods/` dans le même
-arbre `assets/`, puis relance avec `--all-namespaces`.
+Avec les ~480 mods de FTB Skies 2, la seconde commande produit un pack
+nettement plus complet que celui livré ici, et c'est **la** façon de garder des
+blocs modés corrects si tu joues avec Complementary en mode labPBR.
 
-> Les textures d'origine servent uniquement de **source de calcul**. Elles ne
-> sont jamais copiées dans le pack produit — un test automatisé le vérifie.
+Options utiles : `--no-client` pour ne traiter que les mods, `--verbose` pour
+voir le détail par archive. En cas de doublon entre deux archives, la première
+lue gagne.
 
----
+> L'outil n'extrait que `textures/block` et `textures/item`, refuse toute entrée
+> d'archive qui chercherait à écrire hors du dossier de sortie, et ces textures
+> ne servent **que** de source de calcul : elles ne sont jamais copiées dans le
+> pack produit — un test automatisé le vérifie.
 
 ## Construire le pack
 
@@ -197,7 +234,7 @@ Aucune dépendance : **Python 3.8+** et rien d'autre (le codec PNG est inclus).
 python3 tools/build.py --zip          # génère build/pack/ et build/dist/*.zip
 python3 tools/validate.py             # vérifie la conformité LabPBR
 python3 tools/preview.py              # aperçu éclairé, sans lancer le jeu
-python3 tests/test_pipeline.py        # 31 tests
+python3 tests/test_pipeline.py        # 36 tests
 ```
 
 Options utiles :
@@ -247,9 +284,22 @@ Les champs disponibles :
 ## Dépannage
 
 **Je ne vois aucune différence.**
-Vérifie dans l'ordre : un shader est-il actif ? les *normal maps* et *specular
-maps* sont-elles activées dans les options du shader ? le pack est-il **au-dessus**
-des autres dans la liste ? Sans shader, il est parfaitement normal de ne rien voir.
+Vérifie dans l'ordre : (1) un shader est-il réellement sélectionné — aucun ne
+l'est d'origine ; (2) `RP Support` est-il sur **labPBR** — c'est la cause n°1 ;
+(3) le pack est-il **au-dessus** des autres dans la liste. Sans shader actif, il
+est parfaitement normal de ne rien voir : c'est le principe même d'un pack PBR.
+
+**Mon pack se désactive tout seul.**
+Ce n'est pas un caprice : quand un rechargement de ressources échoue, FTB Skies 2
+(via ResourcePackOverrides) réinitialise la sélection à sa liste par défaut,
+jusqu'à cinq fois par session. La cause est donc un pack en erreur, pas le
+mécanisme. Lance `python3 tools/validate.py` sur le pack décompressé.
+
+**Certains blocs de Chipped, Rechiseled ou les tuyaux ont un relief décalé.**
+Le modpack embarque des mods de textures connectées (CTM, Athena, Fusion). Pour
+ces blocs, les cartes doivent suivre la disposition en tuiles du mod ; le
+générateur produit une carte par fichier, ce qui convient aux blocs ordinaires
+mais pas aux atlas CTM. Ces blocs-là restent mieux servis sans PBR.
 
 **Le pack est marqué « Incompatible » en rouge.**
 Ce n'est qu'un avertissement de version : confirme, le pack se charge normalement.
@@ -288,6 +338,7 @@ ftb-skies-2-pbr/
 │   ├── patterns.py    17 motifs de relief tuilables + normales/occlusion
 │   ├── materials.py   catalogue : 643 textures et leurs propriétés LabPBR
 │   ├── build.py       génération du pack
+│   ├── collect_assets.py  extrait les textures d'une instance (client + mods)
 │   ├── validate.py    contrôle de conformité LabPBR
 │   └── preview.py     rendu d'aperçu hors du jeu
 ├── tests/
