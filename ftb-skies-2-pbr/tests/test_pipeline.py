@@ -647,6 +647,85 @@ class TestReferenceBuild(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_legacy_blocks_prefix_is_not_emitted_twice(self):
+        """Les arbres d'avant 1.13 rangent les textures sous blocks/. Si on ne
+        cherche que sous block/, la texture est generee deux fois : une carte
+        procedurale 16x16 sous block/ - celle que le jeu charge - devant une
+        base haute definition, et une carte derivee sous blocks/."""
+        tmp = tempfile.mkdtemp()
+        try:
+            legacy = os.path.join(tmp, "src", "assets", "minecraft", "textures", "blocks")
+            os.makedirs(legacy)
+            big = Image(64, 64)
+            for y in range(64):
+                for x in range(64):
+                    big.put(x, y, ((x * 4) % 256, (y * 4) % 256, 80, 255))
+            write_png(os.path.join(legacy, "cobblestone.png"), big)
+            pack, stats = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                   vanilla=os.path.join(tmp, "src")))
+            block_out = os.path.join(pack, "assets/minecraft/textures/block/cobblestone_n.png")
+            legacy_out = os.path.join(pack, "assets/minecraft/textures/blocks/cobblestone_n.png")
+            self.assertFalse(os.path.isfile(block_out),
+                             "carte procedurale emise en doublon sous block/")
+            self.assertTrue(os.path.isfile(legacy_out))
+            img = read_png(legacy_out)
+            self.assertEqual((img.w, img.h), (64, 64), "la carte doit suivre la base")
+            self.assertEqual(stats["guessed"], 0, "la texture doit garder son materiau catalogue")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_tall_texture_without_mcmeta_is_skipped(self):
+        """Base decoupee en N images, carte stitchee en un seul sprite : le
+        decalage serait silencieux, donc on n'ecrit rien."""
+        tmp = tempfile.mkdtemp()
+        try:
+            block = os.path.join(tmp, "src", "assets", "minecraft", "textures", "block")
+            os.makedirs(block)
+            write_png(os.path.join(block, "sea_lantern.png"),
+                      Image(16, 80, fill=(200, 220, 255, 255)))
+            pack, stats = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                   vanilla=os.path.join(tmp, "src")))
+            self.assertEqual(stats["skipped_no_mcmeta"], 1)
+            self.assertFalse(os.path.isfile(os.path.join(
+                pack, "assets/minecraft/textures/block/sea_lantern_n.png")))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_transparent_pixels_do_not_create_a_cliff(self):
+        """Minecraft stocke les pixels invisibles en RVB nul. S'ils entrent dans
+        la normalisation, le contour d'un feuillage devient une falaise et les
+        pixels opaques voisins recoivent une normale presque horizontale."""
+        tmp = tempfile.mkdtemp()
+        try:
+            block = os.path.join(tmp, "src", "assets", "minecraft", "textures", "block")
+            os.makedirs(block)
+            im = Image(16, 16)
+            for y in range(16):
+                for x in range(16):
+                    if x < 8:
+                        v = 100 + (x + y) % 10          # variation faible, opaque
+                        im.put(x, y, (v, v, v, 255))
+                    else:
+                        im.put(x, y, (0, 0, 0, 0))      # invisible, RVB nul
+            write_png(os.path.join(block, "oak_leaves.png"), im)
+            pack, _st = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                 vanilla=os.path.join(tmp, "src")))
+            n = read_png(os.path.join(pack, "assets/minecraft/textures/block/oak_leaves_n.png"))
+
+            def slope(x):
+                return max(abs(n.get(x, y)[0] - 127) for y in range(16))
+
+            # La colonne 7 est le dernier pixel opaque avant la zone invisible.
+            # Le motif procedural cree partout des pentes legitimes : ce qui
+            # compte est que le contour ne soit pas plus abrupt que l'interieur.
+            border = slope(7)
+            interior = max(slope(x) for x in range(1, 7))
+            self.assertLessEqual(border, interior * 1.3,
+                                 "falaise au contour : pente %d contre %d a "
+                                 "l'interieur" % (border, interior))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_validator_passes_on_reference_build(self):
         errs, _warns, checked, _pairs = VAL.validate(self.pack)
         self.assertEqual(errs, [])

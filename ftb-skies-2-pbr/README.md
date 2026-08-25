@@ -247,7 +247,7 @@ Aucune dépendance : **Python 3.8+** et rien d'autre (le codec PNG est inclus).
 python3 tools/build.py --zip          # génère build/pack/ et build/dist/*.zip
 python3 tools/validate.py             # vérifie la conformité LabPBR
 python3 tools/preview.py              # aperçu éclairé, sans lancer le jeu
-python3 tests/test_pipeline.py        # 44 tests
+python3 tests/test_pipeline.py        # 47 tests
 ```
 
 Options utiles :

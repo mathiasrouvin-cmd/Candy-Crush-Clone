@@ -129,12 +129,26 @@ def luminance(px):
 def height_from_image(img, blend=0.65, name="", layers=None):
     """Relief derive de la luminance de la texture d'origine, melange au motif
     procedural. La luminance seule donne un relief trop bruite sur les textures
-    tres colorees ; le motif ramene la structure macroscopique du materiau."""
+    tres colorees ; le motif ramene la structure macroscopique du materiau.
+
+    Les pixels transparents sont exclus du calcul : Minecraft les stocke en RVB
+    nul, si bien qu'ils tireraient la normalisation vers le noir et creeraient
+    une fausse falaise tout autour des feuillages et des barreaux. On leur
+    substitue la moyenne des pixels visibles, ce qui rend le gradient plat au
+    contour."""
     w, h = img.w, img.h
-    lum = [luminance(img.get(i % w, i // w)) for i in range(w * h)]
-    lo, hi = min(lum), max(lum)
+    px = [img.get(i % w, i // w) for i in range(w * h)]
+    visible = [i for i in range(w * h) if px[i][3] >= 8]
+    if not visible:
+        return [1.0] * (w * h)
+    lum = [luminance(p) for p in px]
+    vals = [lum[i] for i in visible]
+    lo, hi = min(vals), max(vals)
+    mean = sum(vals) / len(vals)
     if hi - lo > 1e-6:
-        lum = [(v - lo) / (hi - lo) for v in lum]
+        lum = [((lum[i] if px[i][3] >= 8 else mean) - lo) / (hi - lo)
+               for i in range(w * h)]
+        lum = [max(0.0, min(1.0, v)) for v in lum]
     else:
         lum = [1.0] * (w * h)
     if not layers:
@@ -390,17 +404,28 @@ def generate(args):
                                   getattr(args, "items", False))
     stats = {"generated": 0, "from_reference": 0, "procedural": 0,
              "guessed": 0, "skipped_animated": 0, "animated_handled": 0,
-             "skipped_unreadable": 0, "namespaces": set(), "emissive": 0}
+             "skipped_unreadable": 0, "skipped_no_mcmeta": 0,
+             "namespaces": set(), "emissive": 0}
 
-    # 1) Ce qui est explicitement catalogue (vanilla 1.21.1)
+    # 1) Ce qui est explicitement catalogue (vanilla 1.21.1). Les arbres
+    #    d'avant 1.13 rangent les textures sous "blocks/" : on cherche sous les
+    #    deux prefixes, faute de quoi la texture serait emise deux fois - une
+    #    carte procedurale sous block/ et une carte derivee sous blocks/.
+    PREFIXES = ("block", "blocks")
     work = []
     for name, m in sorted(MAT.TEXTURES.items()):
-        ref = reference.get(("minecraft", "block/%s.png" % name))
-        work.append(("minecraft", "block/%s.png" % name, name, m, ref, False))
+        ref, rel = None, "block/%s.png" % name
+        for pfx in PREFIXES:
+            key = ("minecraft", "%s/%s.png" % (pfx, name))
+            if key in reference:
+                ref, rel = reference[key], key[1]
+                break
+        work.append(("minecraft", rel, name, m, ref, False))
 
     # 2) Les textures de reference non catalogues (blocs de mods, oublis vanilla)
     if reference:
-        known = {("minecraft", "block/%s.png" % n) for n in MAT.TEXTURES}
+        known = {("minecraft", "%s/%s.png" % (pfx, n))
+                 for n in MAT.TEXTURES for pfx in PREFIXES}
         for key, path in sorted(reference.items()):
             if key in known:
                 continue
@@ -442,7 +467,14 @@ def generate(args):
             w, h = base_img.w, base_img.h
             if w == 0 or h == 0 or w > 1024 or h > 4096:
                 continue
-            if h > w:                                       # texture animee
+            if h > w:                                       # bande d'animation
+                if not frames_meta:
+                    # sans .mcmeta on ignore le decoupage en images : la base
+                    # serait stitchee en N images et la carte en un seul sprite
+                    if args.verbose:
+                        print("  ! %s : %dx%d sans .mcmeta, ignoree" % (rel, w, h))
+                    stats["skipped_no_mcmeta"] += 1
+                    continue
                 stats["animated_handled"] += 1
             height = height_from_image(base_img, args.blend, name, m["layers"])
             emask = emissive_mask_from_image(base_img) if m["emission"] > 0 else None
@@ -523,6 +555,8 @@ def main():
     print("  animées ignorées         : %d" % stats["skipped_animated"])
     if stats["skipped_unreadable"]:
         print("  illisibles ignorées      : %d" % stats["skipped_unreadable"])
+    if stats["skipped_no_mcmeta"]:
+        print("  bandes sans .mcmeta      : %d" % stats["skipped_no_mcmeta"])
     print("  textures émissives       : %d" % stats["emissive"])
     print("  namespaces               : %s" % ", ".join(sorted(stats["namespaces"])))
     print("  pack                     : %s" % pack_dir)
