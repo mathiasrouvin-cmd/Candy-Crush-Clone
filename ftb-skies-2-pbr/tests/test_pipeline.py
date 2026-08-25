@@ -293,6 +293,51 @@ class TestLabPbrEncoding(unittest.TestCase):
         self.assertEqual({img.get(x, y)[3] for y in range(16) for x in range(16)}, {255})
 
 
+class TestRobustness(unittest.TestCase):
+    """Le mode --vanilla suit la taille de la texture d'origine : bandes
+    d'animation (jusqu'a 16x512), packs HD, et quelques tailles degenerees."""
+
+    SIZES = [(16, 16), (16, 48), (16, 80), (16, 512), (32, 32), (1, 1), (3, 7)]
+
+    def test_every_pattern_at_every_size(self):
+        for (w, h) in self.SIZES:
+            for name, fn in PAT.PATTERNS.items():
+                with self.subTest(pattern=name, size=(w, h)):
+                    hm = fn(w, h, name="t")
+                    self.assertEqual(len(hm), w * h)
+                    self.assertTrue(all(-1e-9 <= v <= 1 + 1e-9 for v in hm))
+
+    def test_whole_catalogue_encodes_at_every_size(self):
+        # Tout le catalogue sur les petites tailles ; un echantillon
+        # deterministe sur les grandes, qui coutent cher a encoder.
+        catalogue = sorted(MAT.TEXTURES.items())
+        for (w, h) in self.SIZES:
+            subset = catalogue if w * h <= 16 * 48 else catalogue[::25]
+            for tname, m in subset:
+                hm = PAT.compose(m["layers"], w, h, tname)
+                n = BUILD.encode_normal(hm, w, h, m)
+                s = BUILD.encode_specular(w, h, m, tname)
+                self.assertEqual((n.w, n.h, s.w, s.h), (w, h, w, h))
+                step = max(1, (w * h) // 11)
+                for i in range(0, w * h, step):
+                    px_n = n.get(i % w, i // w)
+                    px_s = s.get(i % w, i // w)
+                    self.assertGreaterEqual(px_n[3], 1, "%s : hauteur nulle" % tname)
+                    self.assertFalse(238 <= px_s[1] <= 254, "%s : F0 reserve" % tname)
+                    if m["emission"] == 0:
+                        self.assertEqual(px_s[3], 255, "%s : emission parasite" % tname)
+                    elif m.get("emissive_layers") is None:
+                        self.assertNotEqual(px_s[3], 255, "%s : emission perdue" % tname)
+
+    def test_animated_names_are_never_emitted_procedurally(self):
+        """Une carte de taille non multiple de la base ferait rééchantillonner
+        le _s en bilinéaire, ce qui corrompt ses canaux discrets."""
+        for name in MAT.ANIMATED:
+            self.assertIn(name, MAT.TEXTURES,
+                          "%s est ecartee mais absente du catalogue : elle "
+                          "n'aurait aucun materiau en mode --vanilla" % name)
+
+
 class TestGuessMaterial(unittest.TestCase):
     def test_mod_blocks_map_to_sensible_materials(self):
         cases = {
