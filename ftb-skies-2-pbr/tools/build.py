@@ -331,7 +331,7 @@ def make_pack_icon(size=128):
 # ---------------------------------------------------------------------------
 
 
-def collect_reference(vanilla_root, all_namespaces):
+def collect_reference(vanilla_root, all_namespaces, include_items=False):
     """Repere les textures de reference : {(namespace, sous-chemin): fichier}."""
     found = {}
     if not vanilla_root:
@@ -346,7 +346,10 @@ def collect_reference(vanilla_root, all_namespaces):
         tex_root = os.path.join(assets, ns, "textures")
         if not os.path.isdir(tex_root):
             continue
-        for sub in ("block", "blocks"):
+        subdirs = ["block", "blocks"]
+        if include_items:
+            subdirs += ["item", "items"]
+        for sub in subdirs:
             d = os.path.join(tex_root, sub)
             if not os.path.isdir(d):
                 continue
@@ -381,12 +384,13 @@ def generate(args):
         fh.write("# Format des cartes PBR fournies par ce pack.\n"
                  "# Active MC_TEXTURE_FORMAT_LAB_PBR / _1_3 cote shader et le\n"
                  "# filtrage adapte des canaux discrets du _s.\n"
-                 "format = %s\n" % LABPBR_FORMAT)
+                 "format=%s\n" % LABPBR_FORMAT)
 
-    reference = collect_reference(args.vanilla, args.all_namespaces)
+    reference = collect_reference(args.vanilla, args.all_namespaces,
+                                  getattr(args, "items", False))
     stats = {"generated": 0, "from_reference": 0, "procedural": 0,
              "guessed": 0, "skipped_animated": 0, "animated_handled": 0,
-             "namespaces": set(), "emissive": 0}
+             "skipped_unreadable": 0, "namespaces": set(), "emissive": 0}
 
     # 1) Ce qui est explicitement catalogue (vanilla 1.21.1)
     work = []
@@ -407,19 +411,26 @@ def generate(args):
     for ns, rel, name, m, ref, is_guess in work:
         base_img = None
         frames_meta = None
+        unreadable = False
         if ref:
             try:
                 base_img = read_png(ref)
             except Exception as exc:                       # texture illisible
                 if args.verbose:
-                    print("  ! illisible %s (%s)" % (rel, exc))
+                    print("  ! illisible, ignoree : %s (%s)" % (rel, exc))
                 base_img = None
+                unreadable = True
             meta_path = ref + ".mcmeta"
             if base_img is not None and os.path.isfile(meta_path):
                 with open(meta_path, "r", encoding="utf-8", errors="replace") as fh:
                     frames_meta = fh.read()
 
         if base_img is None:
+            if unreadable:
+                # on connait l'existence de la texture mais pas sa taille reelle :
+                # generer une carte de taille arbitraire ferait plus de mal que bien
+                stats["skipped_unreadable"] += 1
+                continue
             if name in MAT.ANIMATED:
                 stats["skipped_animated"] += 1
                 continue
@@ -479,6 +490,8 @@ def main():
     p = argparse.ArgumentParser(description="Genere le pack de textures PBR Skies PBR.")
     p.add_argument("--vanilla", default=None,
                    help="dossier assets/ (ou parent) contenant les textures de reference")
+    p.add_argument("--items", action="store_true",
+                   help="traiter aussi textures/item (mode reference uniquement)")
     p.add_argument("--all-namespaces", action="store_true",
                    help="traiter tous les namespaces trouves, pas seulement minecraft (blocs de mods)")
     p.add_argument("--resolution", type=int, default=1,
@@ -508,6 +521,8 @@ def main():
     print("  matériaux devinés (mods) : %d" % stats["guessed"])
     print("  animées prises en charge  : %d" % stats["animated_handled"])
     print("  animées ignorées         : %d" % stats["skipped_animated"])
+    if stats["skipped_unreadable"]:
+        print("  illisibles ignorées      : %d" % stats["skipped_unreadable"])
     print("  textures émissives       : %d" % stats["emissive"])
     print("  namespaces               : %s" % ", ".join(sorted(stats["namespaces"])))
     print("  pack                     : %s" % pack_dir)

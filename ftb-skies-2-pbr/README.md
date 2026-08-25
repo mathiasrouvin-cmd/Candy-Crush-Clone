@@ -74,25 +74,54 @@ Shaders qui exploitent LabPBR (donc ce pack) :
 
 ### 3. Les réglages du shader (l'étape qu'on oublie)
 
-Un pack LabPBR parfait ne fait **rien** si le shader n'est pas configuré pour
-lire les cartes. Dans *Options → Vidéo → Shaders → Shader Pack Settings* :
+Un pack LabPBR parfait ne fait **rien** tant que le shader n'est pas réglé pour
+lire les cartes.
 
-- **Material / Resource Pack → Normal maps** : activé
-- **Material / Resource Pack → Specular maps** : activé
-- **Format** : `LabPBR` (et non `SEUS` / `oldPBR`)
-- **Parallax Occlusion Mapping (POM)** : activé si tu veux le relief en volume
-  — c'est le réglage le plus coûteux en performances
-- **POM depth / quality** : baisse la profondeur si les bords des blocs
-  « bavent » de près
+> **Iris n'a aucun bouton « Normal maps » / « Specular maps ».** Ces bascules
+> n'existent que sous OptiFine. Tous les tutoriels qui te disent de les activer
+> « dans l'écran de sélection des shaders » décrivent OptiFine. Sous Iris, tout
+> se passe dans les options **du shader lui-même** :
+> *Options → Vidéo → Shaders → (roue dentée) Shader Options*.
 
-Sur Complementary, ces options sont dans *Material* ; sur BSL dans
-*Material / Parallax*.
+| Shader | Réglages à changer |
+|---|---|
+| **Complementary Reimagined / Unbound**, **Rethinking Voxels** | `RP Support` → **labPBR (RP Required)** (écran racine) · puis *Materials → labPBR/seuspbr Materials → Parallax Occlusion Mapping* → ON · et *Performance Settings → Block Reflect Quality* → au-dessus de *Basic*, sinon aucune réflexion spéculaire |
+| **BSL** | *Material → Advanced Materials* → ON · *Material → Material Format* → **labPBR 1.3** (et non SEUS/Old PBR) · *Material → Normals & Parallax → Parallax Occlusion Mapping* → ON |
+| **Photon** | *Materials* → **trois** bascules distinctes, toutes désactivées d'origine : `Normal Mapping`, `Specular Mapping`, `Parallax Occlusion Mapping` · *Materials → Resource Pack Settings → Texture Format* → `labPBR` |
+| **Kappa / Nostalgia** | *Terrain → Parallax Occlusion Mapping* → ON · *Reflections → Resourcepack Reflections* → ON |
 
----
+Deux pièges fréquents :
+
+- Sur Complementary et Rethinking Voxels, **les curseurs POM restent visibles et
+  cliquables même quand `RP Support` est sur *Basic* ou *Integrated PBR+*** — ils
+  ne font alors strictement rien. Règle `RP Support` **en premier**.
+- Sur BSL, toute option dont le libellé finit par `*` est inerte tant que
+  *Advanced Materials* est désactivé. Et un mauvais *Material Format* ne produit
+  pas d'erreur : juste des reflets faux, mais crédibles.
+
+### ⚠️ À lire si tu joues avec Complementary ou Rethinking Voxels
+
+Sur ces shaders, passer `RP Support` sur **labPBR désactive Integrated PBR+** —
+le système qui génère automatiquement du relief, des minerais brillants et du
+verre travaillé pour *tous* les blocs, y compris ceux des mods.
+
+Sur un modpack comme FTB Skies 2, la conséquence est très concrète : les blocs
+des mods qui n'ont pas de cartes LabPBR deviennent **plats et ternes** à
+l'instant où tu bascules. Tu as trois options :
+
+1. **La bonne** : génère le pack en mode référence en incluant les mods
+   (`--vanilla … --all-namespaces`, voir plus bas). Les blocs modés reçoivent
+   alors eux aussi leurs cartes, et rien ne se dégrade.
+2. Utilise un shader qui n'a pas ce couplage — **BSL** ou **Photon** — où
+   activer les cartes n'éteint aucun système de secours.
+3. Reste sur *Integrated PBR+* et renonce au POM : le pack ne servira presque
+   à rien.
+
+Ce point est la principale raison d'être du mode `--all-namespaces`.
 
 ## Ce que couvre le pack
 
-**503 textures** de blocs vanilla 1.21.1, réparties par famille de matériau :
+**643 textures** de blocs vanilla 1.21.1, réparties par famille de matériau :
 
 - pierres, roches profondes, tuf, blackstone, basalte, calcite
 - briques, tuiles, blocs ciselés, grès et grès rouge
@@ -104,8 +133,9 @@ Sur Complementary, ces options sont dans *Material* ; sur BSL dans
   — le cuivre perd sa brillance au fil des quatre stades d'oxydation
 - verres, verres teintés, terres cuites, terres cuites vernissées, bétons,
   poudres de béton, laines
-- Nether, End, prismarine, sculk, améthyste
-- **36 textures émissives** : pierre lumineuse, lanternes, torches, lampes de
+- Nether, End, prismarine, sculk, améthyste, coraux
+- portes, trappes, rails, établis, ruches, os, cloches, enchantement
+- **41 textures émissives** : pierre lumineuse, lanternes, torches, lampes de
   redstone allumées, champilampes, grenouillumes, obsidienne pleureuse,
   ampoules de cuivre, tiges de l'End, catalyseurs sculk…
 
@@ -167,7 +197,7 @@ Aucune dépendance : **Python 3.8+** et rien d'autre (le codec PNG est inclus).
 python3 tools/build.py --zip          # génère build/pack/ et build/dist/*.zip
 python3 tools/validate.py             # vérifie la conformité LabPBR
 python3 tools/preview.py              # aperçu éclairé, sans lancer le jeu
-python3 tests/test_pipeline.py        # 29 tests
+python3 tests/test_pipeline.py        # 31 tests
 ```
 
 Options utiles :
@@ -176,6 +206,7 @@ Options utiles :
 |---|---|
 | `--vanilla <dir>` | dérive les cartes des vraies textures |
 | `--all-namespaces` | couvre aussi les blocs de mods |
+| `--items` | traite aussi `textures/item` (mode référence) |
 | `--no-pom` | aucun relief en volume (hauteur plate) — si le POM te gêne |
 | `--no-ao` | désactive l'occlusion ambiante intégrée |
 | `--blend 0..1` | dosage entre relief réel et motif procédural (0,65 par défaut) |
@@ -242,6 +273,10 @@ Vérifie que `assets/minecraft/optifine/texture.properties` est bien présent da
 le pack : sans lui, Iris filtre les cartes `_s` en linéaire et mélange les
 identifiants de métaux avec l'émission. `tools/validate.py` le contrôle.
 
+**Les blocs des mods sont devenus ternes depuis que j'ai activé labPBR.**
+Comportement attendu sur Complementary et Rethinking Voxels : voir
+l'avertissement plus haut. Régénère avec `--all-namespaces`.
+
 ---
 
 ## Structure du dépôt
@@ -251,7 +286,7 @@ ftb-skies-2-pbr/
 ├── tools/
 │   ├── pngio.py       codec PNG pur Python (lecture/écriture RGBA)
 │   ├── patterns.py    17 motifs de relief tuilables + normales/occlusion
-│   ├── materials.py   catalogue : 503 textures et leurs propriétés LabPBR
+│   ├── materials.py   catalogue : 643 textures et leurs propriétés LabPBR
 │   ├── build.py       génération du pack
 │   ├── validate.py    contrôle de conformité LabPBR
 │   └── preview.py     rendu d'aperçu hors du jeu
@@ -273,8 +308,10 @@ Le pack respecte la spécification **LabPBR 1.3** :
   nommés 230–237, la plage 238–254 réservée est évitée), B = porosité (0–64) ou
   diffusion (65–255), A = émission — avec **255 = aucune émission**, le piège
   classique du format, qu'un test verrouille explicitement ;
-- `assets/minecraft/optifine/texture.properties` déclare `format = lab-pbr/1.3`,
-  ce qui active côté Iris le filtrage adapté aux canaux discrets du `_s` ;
+- `assets/minecraft/optifine/texture.properties` déclare `format=lab-pbr/1.3` —
+  chemin codé en dur dans Iris. Il active les macros
+  `MC_TEXTURE_FORMAT_LAB_PBR` / `_1_3` côté shader et le filtrage adapté aux
+  canaux discrets du `_s` (1.3 est la seule version qu'Iris accepte sans risque) ;
 - toutes les cartes sont écrites en **PNG RGBA 32 bits** : l'alpha y est une
   donnée, pas une transparence.
 

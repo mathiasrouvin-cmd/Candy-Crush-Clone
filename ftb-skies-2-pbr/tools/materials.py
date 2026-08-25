@@ -481,3 +481,71 @@ add(["mushroom_block_inside", "brown_mushroom_block", "red_mushroom_block"],
     derive(FOLIAGE, smooth=26, sss=170, relief=0.9))
 add(["note_block", "jukebox_side", "jukebox_top"], derive(PLANK, smooth=48))
 add(["obsidian_pillar"], OBSIDIAN)
+
+
+# --- Menuiseries, mobilier et blocs utilitaires ---------------------------
+for _w in WOODS + STEMS + ["bamboo"]:
+    add(["%s_door_top" % _w, "%s_door_bottom" % _w, "%s_trapdoor" % _w],
+        derive(PLANK, relief=0.85, pom=0.65))
+
+add(["rail", "rail_corner", "powered_rail", "powered_rail_on", "detector_rail",
+     "detector_rail_on", "activator_rail", "activator_rail_on"],
+    derive(METAL_SMOOTH, smooth=155, f0=METAL_IRON, relief=1.0, pom=0.75,
+           layers=[("slats", 1.0, dict(n=8, axis="h", depth=0.7, thickness=1)),
+                   ("strips", 0.6, dict(axis="v", width=6, depth=0.5))]))
+
+add(["bone_block_top", "bone_block_side"],
+    derive(POLISHED_STONE, smooth=54, porosity=26, relief=0.6, pom=0.4,
+           layers=[("strips", 1.0, dict(axis="v", width=3, depth=0.4)),
+                   ("fbm", 0.4, dict(octaves=3, scale=5))]))
+add(["bell_top", "bell_side", "bell_bottom"],
+    derive(METAL_SMOOTH, smooth=214, f0=METAL_GOLD, relief=0.5))
+add(["lodestone_top", "lodestone_side"], derive(POLISHED_STONE, smooth=88, relief=0.7))
+add(["brewing_stand", "brewing_stand_base"],
+    derive(METAL_SMOOTH, smooth=140, f0=METAL_IRON, relief=0.7))
+add(["spawner"], derive(METAL_SMOOTH, smooth=70, f0=METAL_IRON, relief=1.2, pom=0.9,
+                        layers=[("slats", 1.0, dict(n=4, axis="h", depth=0.9, thickness=1)),
+                                ("slats", 0.9, dict(n=4, axis="v", depth=0.9, thickness=1))]))
+
+for _t in ["smithing_table_top", "smithing_table_side", "smithing_table_front",
+           "smithing_table_bottom", "fletching_table_top", "fletching_table_side",
+           "fletching_table_front", "cartography_table_top", "cartography_table_side1",
+           "cartography_table_side2", "cartography_table_side3", "loom_top",
+           "loom_side", "loom_front", "loom_bottom", "composter_top",
+           "composter_side", "composter_bottom"]:
+    add(_t, PLANK)
+add(["grindstone_side", "grindstone_pivot", "grindstone_round",
+     "stonecutter_top", "stonecutter_side", "stonecutter_bottom"],
+    derive(COBBLE, smooth=44, relief=0.8))
+add(["enchanting_table_top", "enchanting_table_side", "enchanting_table_bottom"],
+    derive(OBSIDIAN, smooth=150, relief=0.7, pom=0.5))
+
+for _b in ["beehive_end", "beehive_side", "beehive_front", "beehive_front_honey",
+           "bee_nest_top", "bee_nest_side", "bee_nest_front", "bee_nest_front_honey",
+           "bee_nest_bottom"]:
+    add(_b, derive(PLANK, smooth=36, sss=120, porosity=0, relief=0.8,
+                   layers=[("scales", 1.0, dict(size=4, depth=0.4)),
+                           ("grain", 0.5, dict(axis="v", amp=0.25))]))
+
+# --- Coraux ----------------------------------------------------------------
+for _c in ["tube", "brain", "bubble", "fire", "horn"]:
+    add(["%s_coral_block" % _c, "%s_coral" % _c, "%s_coral_fan" % _c],
+        derive(FOLIAGE, smooth=40, sss=200, relief=1.0, pom=0.7))
+    add(["dead_%s_coral_block" % _c, "dead_%s_coral" % _c, "dead_%s_coral_fan" % _c],
+        derive(ROUGH_STONE, smooth=16, porosity=54, relief=0.95))
+
+# --- Vegetation et divers --------------------------------------------------
+add(["cobweb", "vine", "lily_pad", "chorus_flower", "chorus_plant",
+     "mushroom_stem", "sea_pickle", "mangrove_roots_top", "mangrove_roots_side"],
+    derive(FOLIAGE, smooth=20, sss=180, relief=0.85))
+add(["cake_top", "cake_side", "cake_bottom", "cake_inner"],
+    derive(WOOL, smooth=22, porosity=44, relief=0.6))
+add(["tnt_top", "tnt_side", "tnt_bottom"], derive(WOOL, smooth=18, porosity=40))
+add(["dragon_egg"], derive(OBSIDIAN, smooth=196, emission=0.25, sss=90, porosity=0,
+                           relief=0.8, pom=0.55))
+add(["respawn_anchor_bottom"], OBSIDIAN)
+add(["respawn_anchor_side0"], derive(OBSIDIAN, smooth=168))
+for _i in range(1, 5):
+    add("respawn_anchor_side%d" % _i,
+        derive(OBSIDIAN, smooth=168, emission=0.20 * _i,
+               emissive_layers=[("crystal", 1.0, dict(facets=4))]))

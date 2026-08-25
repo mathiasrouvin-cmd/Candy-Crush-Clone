@@ -32,7 +32,7 @@ from pngio import Image, read_png, write_png   # noqa: E402
 
 def make_args(**over):
     a = argparse.Namespace(vanilla=None, all_namespaces=False, resolution=1,
-                           blend=0.65, no_pom=False, no_ao=False,
+                           blend=0.65, no_pom=False, no_ao=False, items=False,
                            out=None, zip=False, verbose=False)
     for k, v in over.items():
         setattr(a, k, v)
@@ -394,6 +394,49 @@ class TestReferenceBuild(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(base, name + "_n.png")))
             s = read_png(os.path.join(base, name + "_s.png"))
             self.assertGreaterEqual(s.get(0, 0)[1], 230, "%s devrait etre metallique" % name)
+
+    def test_unreadable_reference_is_skipped_not_guessed(self):
+        """Une texture de reference illisible ne doit pas produire une carte de
+        taille arbitraire : Iris redimensionnerait le _s en bilineaire et
+        corromprait les identifiants de metaux et le sentinel d'emission."""
+        tmp = tempfile.mkdtemp()
+        try:
+            block = os.path.join(tmp, "src", "assets", "minecraft", "textures", "block")
+            os.makedirs(block)
+            with open(os.path.join(block, "cobblestone.png"), "wb") as fh:
+                fh.write(b"\x89PNG\r\n\x1a\n" + b"corrompu" * 8)
+            pack, stats = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                   vanilla=os.path.join(tmp, "src")))
+            self.assertEqual(stats["skipped_unreadable"], 1)
+            out = os.path.join(pack, "assets/minecraft/textures/block/cobblestone_n.png")
+            self.assertFalse(os.path.isfile(out), "carte generee malgre une source illisible")
+            # les autres textures restent generees normalement
+            self.assertTrue(os.path.isfile(os.path.join(
+                pack, "assets/minecraft/textures/block/stone_n.png")))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_items_are_covered_when_requested(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            item = os.path.join(tmp, "src", "assets", "minecraft", "textures", "item")
+            os.makedirs(item)
+            im = Image(16, 16)
+            for y in range(16):
+                for x in range(16):
+                    im.put(x, y, (200, 200, 210, 255 if 4 <= x < 12 else 0))
+            write_png(os.path.join(item, "iron_sword.png"), im)
+            pack, _st = BUILD.generate(make_args(out=os.path.join(tmp, "out"),
+                                                 vanilla=os.path.join(tmp, "src"),
+                                                 items=True))
+            s_path = os.path.join(pack, "assets/minecraft/textures/item/iron_sword_s.png")
+            self.assertTrue(os.path.isfile(s_path))
+            sp = read_png(s_path)
+            self.assertGreaterEqual(sp.get(8, 8)[1], 230, "une epee en fer doit etre metallique")
+            n = read_png(os.path.join(pack, "assets/minecraft/textures/item/iron_sword_n.png"))
+            self.assertEqual(n.get(0, 0), BUILD.NEUTRAL_N, "pixel transparent = normale neutre")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_validator_passes_on_reference_build(self):
         errs, _warns, checked, _pairs = VAL.validate(self.pack)

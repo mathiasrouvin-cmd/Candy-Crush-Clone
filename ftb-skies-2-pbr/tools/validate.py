@@ -6,7 +6,7 @@ et les contraintes de chargement de Minecraft. A lancer apres build.py.
 Controles :
   * pack.mcmeta present, JSON valide, pack_format coherent et inclus dans
     supported_formats
-  * assets/minecraft/optifine/texture.properties declarant format = lab-pbr/1.3
+  * assets/minecraft/optifine/texture.properties declarant format=lab-pbr/1.3
   * pack.png present et carre
   * chaque _n a son _s (et inversement), memes dimensions
   * tous les PNG sont en RVBA 8 bits (l'alpha porte hauteur et emission)
@@ -76,7 +76,7 @@ def validate(pack_dir):
         with open(props, encoding="utf-8") as fh:
             body = fh.read()
         if "lab-pbr/1.3" not in body:
-            errors.append("texture.properties ne declare pas format = lab-pbr/1.3")
+            errors.append("texture.properties ne declare pas format=lab-pbr/1.3")
 
     assets = os.path.join(pack_dir, "assets")
     pairs = {}
@@ -116,7 +116,8 @@ def validate(pack_dir):
 
         for label, img, path in (("_n", n_img, got["n"]), ("_s", s_img, got["s"])):
             if img.h > img.w and not os.path.isfile(path + ".mcmeta"):
-                errors.append("%s%s : texture animee sans .mcmeta" % (name, label))
+                warnings.append("%s%s : plus haute que large sans .mcmeta "
+                                "(animation non declaree ?)" % (name, label))
 
         ao_lo, _ao_hi = channel_stats(n_img, 2)
         if ao_lo < 60:
