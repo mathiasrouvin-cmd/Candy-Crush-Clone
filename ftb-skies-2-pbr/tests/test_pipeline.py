@@ -120,6 +120,85 @@ class TestPngCodec(unittest.TestCase):
         self.assertEqual(big.get(4, 0), (0, 255, 0, 255))
 
 
+class TestPngEdgeCases(unittest.TestCase):
+    """Cas limites du decodeur : ces quatre defauts ont ete trouves en revue."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _png(self, name, w, h, depth, ctype, rows, extra=b"", truncate=0):
+        def chunk(tag, body):
+            return (struct.pack(">I", len(body)) + tag + body
+                    + struct.pack(">I", zlib.crc32(tag + body) & 0xFFFFFFFF))
+        payload = bytes(rows)
+        if truncate:
+            payload = payload[:-truncate]
+        blob = (b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, depth, ctype, 0, 0, 0))
+                + extra + chunk(b"IDAT", zlib.compress(payload, 9))
+                + chunk(b"IEND", b""))
+        p = os.path.join(self.tmp, name)
+        with open(p, "wb") as fh:
+            fh.write(blob)
+        return p
+
+    def test_trns_key_compared_at_full_depth(self):
+        """La cle tRNS est sur 16 bits meme quand on reduit l'image a 8 bits :
+        la comparer a l'octet de poids fort inventerait ou perdrait de la
+        transparence."""
+        rows = bytearray([0]) + bytearray(struct.pack(">H", 0xFFFF))
+        img = read_png(self._png("a.png", 1, 1, 16, 0, rows,
+                                 extra=self._trns(struct.pack(">H", 0xFFFF))))
+        self.assertEqual(img.get(0, 0)[3], 0, "la cle exacte doit rendre transparent")
+
+        rows = bytearray([0]) + bytearray(struct.pack(">H", 0x00FF))
+        img = read_png(self._png("b.png", 1, 1, 16, 0, rows,
+                                 extra=self._trns(struct.pack(">H", 0x0000))))
+        self.assertEqual(img.get(0, 0)[3], 255, "meme octet fort mais valeur differente")
+
+    def test_trns_colour_key_on_truecolour(self):
+        rows = bytearray([0]) + bytearray([255, 0, 0, 0, 255, 0])
+        img = read_png(self._png("c.png", 2, 1, 8, 2, rows,
+                                 extra=self._trns(struct.pack(">HHH", 255, 0, 0))))
+        self.assertEqual(img.get(0, 0)[3], 0)
+        self.assertEqual(img.get(1, 0)[3], 255)
+
+    def test_invalid_colour_type_raises_valueerror(self):
+        with self.assertRaises(ValueError):
+            read_png(self._png("d.png", 1, 1, 8, 5, bytearray([0, 0])))
+
+    def test_truncated_idat_raises_valueerror(self):
+        rows = bytearray()
+        for _y in range(2):
+            rows += bytearray([0]) + bytearray([1, 2, 3, 4] * 2)
+        with self.assertRaises(ValueError):
+            read_png(self._png("e.png", 2, 2, 8, 6, rows, truncate=2))
+
+    def test_validator_reports_corrupt_map_instead_of_crashing(self):
+        pack = os.path.join(self.tmp, "pack")
+        block = os.path.join(pack, "assets/minecraft/textures/block")
+        os.makedirs(block)
+        os.makedirs(os.path.join(pack, "assets/minecraft/optifine"))
+        with open(os.path.join(pack, "pack.mcmeta"), "w") as fh:
+            fh.write('{"pack":{"pack_format":34,"description":"\u00a7bx"}}')
+        with open(os.path.join(pack, "assets/minecraft/optifine/texture.properties"), "w") as fh:
+            fh.write("format=lab-pbr/1.3\n")
+        write_png(os.path.join(pack, "pack.png"), Image(8, 8, fill=(0, 0, 0, 255)))
+        with open(os.path.join(block, "stone_n.png"), "wb") as fh:
+            fh.write(b"\x89PNG\r\n\x1a\n" + b"pourri" * 4)
+        write_png(os.path.join(block, "stone_s.png"), Image(16, 16, fill=(0, 0, 0, 255)))
+        errs, _w, _c, _p = VAL.validate(pack)     # ne doit pas lever
+        self.assertTrue(any("illisible" in e for e in errs), errs)
+
+    @staticmethod
+    def _trns(body):
+        return (struct.pack(">I", len(body)) + b"tRNS" + body
+                + struct.pack(">I", zlib.crc32(b"tRNS" + body) & 0xFFFFFFFF))
+
+
 class TestPatterns(unittest.TestCase):
     def test_all_patterns_bounded(self):
         for name, fn in PAT.PATTERNS.items():

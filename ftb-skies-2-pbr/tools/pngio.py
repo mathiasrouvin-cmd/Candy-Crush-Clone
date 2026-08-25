@@ -143,11 +143,27 @@ def read_png(path):
         # 1/2/4 bits : uniquement rencontre sur des palettes, on refuse proprement
         raise ValueError("profondeur %d bits non supportee: %s" % (depth, path))
 
-    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
+    try:
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
+    except KeyError:
+        raise ValueError("type de couleur PNG invalide (%d): %s" % (ctype, path))
     sample = depth // 8
     bpp = max(1, channels * sample)
     stride = w * channels * sample
-    raw = _unfilter(zlib.decompress(bytes(idat)), w, h, bpp, stride)
+    data = zlib.decompress(bytes(idat))
+    if len(data) < h * (stride + 1):
+        raise ValueError("flux IDAT tronque (%d octets, %d attendus): %s"
+                         % (len(data), h * (stride + 1), path))
+    raw = _unfilter(data, w, h, bpp, stride)
+
+    # La cle de transparence du chunk tRNS est toujours stockee sur 16 bits par
+    # canal, quelle que soit la profondeur de l'image : on la compare donc aux
+    # echantillons a pleine profondeur, jamais a leur reduction 8 bits.
+    key = None
+    if trns and ctype in (0, 2):
+        need = 2 if ctype == 0 else 6
+        if len(trns) >= need:
+            key = tuple(struct.unpack(">%dH" % (need // 2), trns[:need]))
 
     img = Image(w, h)
     step = channels * sample
@@ -156,19 +172,19 @@ def read_png(path):
         for x in range(w):
             i = base + x * step
             if sample == 2:
+                full = tuple((raw[i + k * 2] << 8) | raw[i + k * 2 + 1]
+                             for k in range(channels))
                 vals = [raw[i + k * 2] for k in range(channels)]  # octet de poids fort
             else:
-                vals = [raw[i + k] for k in range(channels)]
+                full = tuple(raw[i + k] for k in range(channels))
+                vals = list(full)
             if ctype == 0:
                 g = vals[0]
-                a = 255
-                if trns and len(trns) >= 2 and struct.unpack(">H", trns[:2])[0] == g:
-                    a = 0
-                px = (g, g, g, a)
+                px = (g, g, g, 0 if key == full else 255)
             elif ctype == 4:
                 px = (vals[0], vals[0], vals[0], vals[1])
             elif ctype == 2:
-                px = (vals[0], vals[1], vals[2], 255)
+                px = (vals[0], vals[1], vals[2], 0 if key == full else 255)
             elif ctype == 6:
                 px = (vals[0], vals[1], vals[2], vals[3])
             else:  # palette

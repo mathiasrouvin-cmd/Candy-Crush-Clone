@@ -64,9 +64,12 @@ def validate(pack_dir):
     if not os.path.isfile(icon):
         errors.append("pack.png manquant")
     else:
-        im = read_png(icon)
-        if im.w != im.h:
-            errors.append("pack.png doit etre carre (%dx%d)" % (im.w, im.h))
+        try:
+            im = read_png(icon)
+            if im.w != im.h:
+                errors.append("pack.png doit etre carre (%dx%d)" % (im.w, im.h))
+        except Exception as exc:
+            errors.append("pack.png illisible : %s" % exc)
 
     props = os.path.join(pack_dir, "assets", "minecraft", "optifine", "texture.properties")
     if not os.path.isfile(props):
@@ -107,7 +110,11 @@ def validate(pack_dir):
         if "s" not in got:
             errors.append("%s : _n sans _s" % name)
             continue
-        n_img, s_img = read_png(got["n"]), read_png(got["s"])
+        try:
+            n_img, s_img = read_png(got["n"]), read_png(got["s"])
+        except Exception as exc:
+            errors.append("%s : carte illisible (%s)" % (name, exc))
+            continue
         checked += 1
 
         if (n_img.w, n_img.h) != (s_img.w, s_img.h):
