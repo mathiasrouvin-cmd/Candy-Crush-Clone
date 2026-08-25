@@ -222,16 +222,27 @@ STEMS = ["crimson", "warped"]
 # Textures animees en vanilla (PNG vertical multi-images + .mcmeta).
 # Une carte _n/_s de dimensions differentes casserait l'atlas : on ne les
 # genere qu'en mode --vanilla, ou l'on connait la taille et l'animation reelles.
+# Chaque nom ci-dessous a une texture d'origine plus haute que large (bande
+# verticale d'images + .mcmeta). Une carte 16x16 en face d'une base 16x48 n'est
+# pas un multiple entier : Iris la rééchantillonne alors en BILINEAIRE, ce qui
+# mélange les identifiants de métaux, franchit la frontière porosité/SSS et
+# dilue le sentinel d'émission. On ne les génère donc qu'en mode --vanilla, où
+# la taille réelle et le .mcmeta sont connus.
 ANIMATED = {
     "sea_lantern", "magma", "prismarine", "nether_portal",
     "fire_0", "fire_1", "soul_fire_0", "soul_fire_1",
     "water_still", "water_flow", "lava_still", "lava_flow",
     "kelp", "kelp_plant", "seagrass", "tall_seagrass_top", "tall_seagrass_bottom",
-    "campfire_fire", "campfire_log_lit", "soul_campfire_fire",
-    "blast_furnace_front_on", "smoker_front_on", "furnace_front_on",
+    "campfire_fire", "campfire_log_lit", "soul_campfire_fire", "soul_campfire_log_lit",
+    "blast_furnace_front_on", "smoker_front_on",
     "stonecutter_saw", "respawn_anchor_top", "sculk", "sculk_vein",
     "sculk_sensor_tendril_active", "sculk_sensor_tendril_inactive",
     "calibrated_sculk_sensor_input_side",
+    # lanternes : 16x48, 3 images - le piège le plus facile à manquer, la
+    # texture ayant tout l'air d'un simple 16x16 dans un explorateur de fichiers
+    "lantern", "soul_lantern",
+    "sculk_catalyst_top_bloom", "sculk_catalyst_side_bloom",
+    "sculk_shrieker_inner_top", "sculk_shrieker_can_summon_inner_top",
 }
 
 TEXTURES = {}
@@ -350,8 +361,9 @@ for _pfx in ["", "exposed_", "weathered_", "oxidized_"]:
         derive(METAL_SMOOTH, smooth=170, f0=METAL_COPPER, relief=0.5,
                layers=[("grid", 1.0, dict(n=2, groove=1, depth=0.5)),
                        ("fbm", 0.3, dict(octaves=2, scale=4))]))
+    _bulb_e = {"": 1.0, "exposed_": 0.80, "weathered_": 0.53, "oxidized_": 0.27}[_pfx]
     add(["%scopper_bulb_lit" % _pfx, "%scopper_bulb_lit_powered" % _pfx],
-        derive(LAMP, smooth=170, f0=METAL_COPPER, emission=0.95))
+        derive(LAMP, smooth=170, f0=METAL_COPPER, emission=_bulb_e))
 
 # --- Bois ------------------------------------------------------------------
 for _w in WOODS:
@@ -442,8 +454,15 @@ add(["shulker_box"], derive(POLISHED_STONE, smooth=110, relief=0.6, pom=0.4))
 # --- Blocs lumineux et redstone -------------------------------------------
 add(["redstone_lamp"], derive(LAMP, emission=0.0, smooth=70))
 add(["redstone_lamp_on"], derive(LAMP, emission=0.9, smooth=90))
-add(["lantern", "soul_lantern"], derive(LAMP, emission=1.0, smooth=150, f0=METAL_IRON))
-add(["torch", "soul_torch", "redstone_torch"], derive(LAMP, emission=1.0, smooth=40, f0=F0_WOOD))
+# torche 14, torche des âmes 10, torche de redstone 7 : les variantes des âmes
+# et de redstone sont nettement plus sombres que la torche ordinaire.
+add(["torch"], derive(LAMP, emission=1.0, smooth=40, f0=F0_WOOD))
+add(["soul_torch"], derive(LAMP, emission=0.70, smooth=40, f0=F0_WOOD))
+add(["redstone_torch"], derive(LAMP, emission=0.48, smooth=40, f0=F0_WOOD))
+# fourneau allumé (lumière 13) : contrairement au haut-fourneau et au fumoir,
+# sa façade allumée est bien une texture statique
+add(["furnace_front_on"], derive(COBBLE, smooth=40, emission=0.85, relief=0.8,
+                                 emissive_layers=[("frame", 1.0, dict(border=4, depth=0.9, inner=1.0))]))
 add(["redstone_torch_off"], derive(PLANK, smooth=40, emission=0.0))
 add(["jack_o_lantern"], derive(FOLIAGE, smooth=30, emission=0.9, sss=120))
 add(["beacon"], derive(GLASS, emission=0.85, smooth=240))
@@ -549,3 +568,75 @@ for _i in range(1, 5):
     add("respawn_anchor_side%d" % _i,
         derive(OBSIDIAN, smooth=168, emission=0.20 * _i,
                emissive_layers=[("crystal", 1.0, dict(facets=4))]))
+
+
+# --- Bougies, lianes lumineuses et blocs des Tricky Trials (1.21) ----------
+# Seules les variantes "_lit" / "_on" / "_active" portent l'émission : les
+# textures éteintes partagent souvent le même bloc et brilleraient à tort.
+WAX = mat(smooth=26, f0=F0_FABRIC, porosity=20, relief=0.7, pom=0.5,
+          layers=[("strips", 1.0, dict(axis="v", width=2, depth=0.35)),
+                  ("fbm", 0.3, dict(octaves=2, scale=4))])
+add(["candle"], WAX)
+add(["candle_lit"], derive(WAX, emission=0.75, smooth=40))
+for _c in COLORS:
+    add("%s_candle" % _c, WAX)
+    add("%s_candle_lit" % _c, derive(WAX, emission=0.75, smooth=40))
+
+add(["cave_vines", "cave_vines_plant"], derive(FOLIAGE, smooth=22, sss=190))
+add(["cave_vines_lit", "cave_vines_plant_lit"],
+    derive(FOLIAGE, smooth=30, sss=190, emission=0.90,
+           emissive_layers=[("organic", 1.0, dict(amp=0.7))]))
+add(["sea_pickle"], derive(FOLIAGE, smooth=44, sss=200, emission=0.30))
+
+_VAULT_BASE = derive(POLISHED_STONE, smooth=96, f0=F0_ROCK, relief=0.9, pom=0.7,
+                     layers=[("frame", 1.0, dict(border=2, depth=0.65, inner=0.88)),
+                             ("fbm", 0.35, dict(octaves=3, scale=5))])
+for _suffix in ["", "_ominous"]:
+    add(["vault_top%s" % _suffix, "vault_bottom%s" % _suffix,
+         "vault_side_off%s" % _suffix, "vault_front_off%s" % _suffix], _VAULT_BASE)
+    add(["vault_side_on%s" % _suffix, "vault_front_on%s" % _suffix,
+         "vault_front_ejecting%s" % _suffix, "vault_top_ejecting%s" % _suffix],
+        derive(_VAULT_BASE, emission=0.65,
+               emissive_layers=[("crystal", 1.0, dict(facets=4))]))
+    add(["trial_spawner_top_inactive%s" % _suffix,
+         "trial_spawner_side_inactive%s" % _suffix], _VAULT_BASE)
+    add(["trial_spawner_top_active%s" % _suffix,
+         "trial_spawner_side_active%s" % _suffix,
+         "trial_spawner_top_ejecting_reward%s" % _suffix],
+        derive(_VAULT_BASE, emission=0.55,
+               emissive_layers=[("organic", 1.0, dict(amp=0.8))]))
+add(["trial_spawner_bottom"], _VAULT_BASE)
+
+
+# --- Textures animées ------------------------------------------------------
+# Elles sont catalogueées pour recevoir le bon matériau en mode --vanilla, où
+# la taille réelle et le .mcmeta sont connus. En mode procédural, ANIMATED les
+# écarte : une carte de dimensions différentes serait rééchantillonnée.
+add(["sea_lantern"], derive(LAMP, emission=1.0, smooth=150, sss=120, porosity=0))
+add(["lantern"], derive(LAMP, emission=1.0, smooth=150, f0=METAL_IRON))
+add(["soul_lantern"], derive(LAMP, emission=0.70, smooth=150, f0=METAL_IRON))
+add(["magma"], derive(NETHER_ROCK, emission=0.62, smooth=40,
+                      emissive_layers=[("fbm", 1.0, dict(octaves=3, scale=4))]))
+add(["prismarine"], PRISMARINE)
+add(["campfire_fire", "soul_campfire_fire", "fire_0", "fire_1"],
+    derive(LAMP, emission=1.0, smooth=10, f0=F0_ORGANIC))
+add(["soul_fire_0", "soul_fire_1"], derive(LAMP, emission=0.70, smooth=10, f0=F0_ORGANIC))
+add(["campfire_log_lit", "soul_campfire_log_lit"],
+    derive(LOG_SIDE, emission=0.60, smooth=30,
+           emissive_layers=[("grain", 1.0, dict(axis="v", amp=0.4))]))
+add(["lava_still", "lava_flow"], derive(NETHER_ROCK, emission=1.0, smooth=24, porosity=0))
+add(["nether_portal"], derive(GLASS, emission=0.80, smooth=200, sss=180, porosity=0))
+add(["respawn_anchor_top"], derive(OBSIDIAN, emission=0.80, smooth=168))
+add(["blast_furnace_front_on", "smoker_front_on"],
+    derive(COBBLE, smooth=40, emission=0.85, relief=0.8,
+           emissive_layers=[("frame", 1.0, dict(border=4, depth=0.9, inner=1.0))]))
+add(["sculk", "sculk_vein"], SCULK)
+add(["sculk_sensor_tendril_active"], derive(SCULK, emission=0.45))
+add(["sculk_sensor_tendril_inactive"], SCULK)
+add(["stonecutter_saw"], derive(METAL_SMOOTH, smooth=170, f0=METAL_IRON, relief=0.8))
+add(["water_still", "water_flow"],
+    mat(smooth=250, f0=F0_WATER, porosity=0, relief=0.25, pom=0.1,
+        layers=[("fbm", 1.0, dict(octaves=3, scale=4))]))
+add(["kelp", "kelp_plant", "seagrass", "tall_seagrass_top", "tall_seagrass_bottom"],
+    derive(FOLIAGE, smooth=60, sss=210))
+add(["calibrated_sculk_sensor_input_side", "calibrated_sculk_sensor_amethyst"], SCULK)
